@@ -1,0 +1,286 @@
+'''
+Auther: rhb434
+'''
+import os
+import time
+import serial
+from com.dtmilano.android.viewclient import ViewClient
+import xlwt
+from xlwt import Workbook, easyxf
+import itertools
+
+wb = xlwt.Workbook()
+ws = wb.add_sheet('at_cmd')
+
+font = xlwt.Font()
+
+style0 = xlwt.easyxf('font: bold on;align: wrap on,vert centre, horiz center;')
+
+col_width = 256 * 70                        # 70 characters wide
+
+try:
+    for i in itertools.count():
+        ws.col(i).width = col_width
+except ValueError:
+    pass
+
+device, serialno = ViewClient.connectToDeviceOrExit()
+vc = ViewClient(device=device, serialno=serialno)
+
+##device.startActivity('')
+fp = device.shell('getprop ro.build.fingerprint')
+print 'Fingerprint is: ', fp
+ws.write(5,0, 'Fingerprint')
+ws.write(5,1, fp)
+
+model = device.shell('getprop ro.model.name')
+model = model.strip()
+print 'Model name is: ', model
+ws.write(6,0, 'Model Name')
+ws.write(6,1, model)
+
+sv1 = device.shell('getprop ro.lge.swversion_short')
+sv2 = device.shell('getprop ro.lge.opensw')
+sv3 = device.shell('getprop persist.sys.first-mccmnc')
+swov = device.shell('getprop ro.lge.factoryversion')
+
+swovVersion = swov.strip()
+print 'SWOV from ENGG menu is: ',swovVersion
+
+software_version1 = sv1.strip()+'-'+sv2.strip()
+print 'The current open Software Version is: ',software_version1
+ws.write(7,0, 'Software Version(for open version)')
+ws.write(7,1, software_version1)
+
+software_version2 = sv1.strip()+'-'+sv3[0:3].strip()+'-'+sv3[3:5].strip()
+print 'The current MCCMNC Software Version is: ',software_version2
+ws.write(8,0, 'Software Version(for NTcode version)')
+ws.write(8,1, software_version1)
+
+kernel = device.shell('cat /proc/version')
+print 'Kernel Version is: ', kernel[14:21]
+ws.write(9,0, 'Kernel Version')
+ws.write(9,1, kernel[14:21])
+
+gms_version = device.shell('getprop ro.com.google.gmsversion')
+gms_version = gms_version.strip()
+print 'GMS version :', gms_version
+ws.write(10,0, 'GMS version')
+ws.write(10,1, gms_version)
+
+ringtone = device.shell('getprop ro.config.ringtone')
+sep1 = '.ogg'
+ringtone = ringtone.split(sep1, 1)[0]
+print 'Default Ringtone :', ringtone
+ws.write(11,0, 'Default Ringtone')
+ws.write(11,1, ringtone)
+
+n_ringtone = device.shell('getprop ro.config.notification_sound')
+n_ringtone = n_ringtone.split(sep1, 1)[0]
+print 'Default Notificatgion tone :', n_ringtone
+ws.write(12,0, 'Default Notificatgion tone')
+ws.write(12,1, n_ringtone)
+
+a_ringtone = device.shell('getprop ro.config.alarm_alert')
+a_ringtone = a_ringtone.split(sep1, 1)[0]
+print 'Default Alarm tone :', a_ringtone
+ws.write(13,0, 'Default Alarm tone')
+ws.write(13,1, a_ringtone)
+
+svn = device.shell('getprop ro.lge.swversion_svn')
+print 'SVN:', svn
+ws.write(19,0, 'SVN')
+ws.write(19,1, svn)
+
+security_patch = device.shell('getprop ro.build.version.security_patch')
+print 'Security Patch Level:', security_patch
+ws.write(20,0, 'Security Patch Level')
+ws.write(20,1, security_patch)
+
+class HModem(object):
+
+    def __init__(self):
+        self.open()
+
+    def open(self):
+        self.ser = serial.Serial('COM19', 460800, timeout=1)
+
+    def SendCommand(self,command, getline=True):
+        self.ser.write(command)
+        data = ''
+        if getline:
+            data=self.ReadLine()
+        return data 
+
+    def ReadLine(self):
+        data = self.ser.readline()
+        return data 
+
+
+
+    def GetAllSMS(self):
+        self.ser.flushInput()
+        self.ser.flushOutput()
+
+        ws.write(0,0, 'SW detals are as below', style0)
+        ws.write(1,0, 'SWV')
+        ws.write(2,0, 'SWOV')
+        ws.write(3,0, 'SWCV')
+        ws.write(4,0, 'SWFV')
+        
+        command = 'AT%SWV\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        sep = ''
+        swv = data.split(sep, 1)[0]
+        swv = swv[3:]
+        print swv
+        ws.write(1,1, swv)
+        
+        command = 'AT%SWOV\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        swov = data.split(sep, 1)[0]
+        swov = swov[3:]
+        print swov
+        ws.write(2,1, swov)
+
+        command = 'AT%SWCV\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        swcv = data.split(sep, 1)[0]
+        swcv = swcv[3:]
+        print swcv
+        ws.write(3,1, swcv)
+        
+        command = 'AT%SWFV\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        swfv = data.split(sep, 1)[0]
+        swfv = swfv[3:]
+        print swfv
+        ws.write(4,1, swfv)
+        wb.save('atcmds.xls')
+
+        command = 'AT%IMEI\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        imei = data.split(sep, 1)[0]
+        imei = imei[3:]
+        print imei
+        ws.write(14,0, 'IMEI')
+        ws.write(14,1, imei)
+        wb.save('atcmds.xls')
+
+        command = 'AT%SLTYPE\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        simlock = data.split(sep, 1)[0]
+        simlock = simlock[3:]
+        print simlock
+        ws.write(15,0, 'SIM LOCK')
+        ws.write(15,1, simlock)
+        wb.save('atcmds.xls')
+
+        command = 'AT%btad\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        btad = data.split(sep, 1)[0]
+        btad = btad[3:]
+        print btad
+        ws.write(16,0, 'BT ADDRESS')
+        ws.write(16,1, btad)
+        wb.save('atcmds.xls')
+
+        command = 'AT%mac\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        mac = data.split(sep, 1)[0]
+        mac = mac[3:]
+        print btad
+        ws.write(17,0, 'MAC ADDRESS')
+        ws.write(17,1, mac)
+        wb.save('atcmds.xls')
+
+        command = 'AT%osver\n'
+        print self.SendCommand(command,getline=True)
+        data = self.ser.readall()
+        osver = data.split(sep, 1)[0]
+        osver = osver[3:]
+        print osver
+        ws.write(18,0, 'OS Version')
+        ws.write(18,1, osver)
+        wb.save('atcmds.xls')
+
+      
+h = HModem()
+h.GetAllSMS()
+
+device.startActivity('com.android.settings/.Settings')
+print 'Settings app launched'
+vc.dump()
+vc.findViewWithText('General').touch()
+
+
+##for i in range(6):
+##    device.shell('input swipe 1045 2503 989 607')
+##    vc.dump()
+##    LI = vc.findViewWithText('Language & input')
+##
+##    if LI:
+##        LI.touch()
+##        print 'clicked on Language and input'
+##        break
+##vc.dump()
+##vc.findViewWithText('On-screen keyboard').touch()
+##print 'Clicked on On-screen keyboard'
+##vc.dump()
+##vc.findViewWithText('LG Keyboard').touch()
+##vc.dump()
+##print 'Clicked on LG Keyboard'
+##vc.findViewWithText('Word suggestions').touch()
+##vc.dump()
+##print 'Clicked on Word suggestions'
+##vc.findViewWithText('Personal dictionary').touch()
+##vc.dump()
+##print 'Clicked on Personal dictionary'
+##delete = vc.findViewWithContentDescription('Delete')
+##for i in range(2):
+##    if delete:
+##        delete.touch()
+##        vc.dump()
+##        vc.findViewWithText('DELETE').touch()
+##        print 'deleted'
+##        vc.dump()
+##        break
+##vc.dump()
+##x = vc.findViewByIdOrRaise('com.lge.ime:id/fab')
+##x.touch()
+##vc.dump()
+##print 'clicked on ADD button'
+##device.shell('input text Test1')
+##vc.dump()
+##vc.findViewByIdOrRaise('com.lge.ime:id/button_save').touch()
+##vc.dump()
+##vc.findViewByIdOrRaise('com.lge.ime:id/fab').touch()
+##vc.dump()
+##device.shell('input text Test2')
+##vc.dump()
+##vc.findViewByIdOrRaise('com.lge.ime:id/button_save').touch()
+##vc.dump()
+##vc.findViewByIdOrRaise('com.lge.ime:id/fab').touch()
+##vc.dump()
+##device.shell('input text Test3')
+##vc.dump()
+##vc.findViewByIdOrRaise('com.lge.ime:id/button_save').touch()
+vc.dump()
+device.shell('input keyevent KEYCODE_HOME')
+##device.startActivity('com.lge.email/.ui.setupwizard.Welcome')
+##device.shell('input keyevent KEYCODE_DPAD_CENTER')
+##device.shell('input keyevent KEYCODE_DPAD_CENTER')
+##device.shell('input keyevent KEYCODE_DPAD_CENTER')
+##device.shell('input text eas.large.a2@eiger.lge.com')
+##device.shell('input keyevent KEYCODE_TAB')
+##device.shell('input text qwe123.')
+##vc.findViewWithContentDescription('NEXT').touch()
+
